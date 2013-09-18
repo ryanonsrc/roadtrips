@@ -1,0 +1,9 @@
+# Routes
+# This file defines all application routes (Higher priority routes first)
+# ~~~~
+
+# Data Tools
+GET     /                             io.nary.roadtrips.controllers.DataTools.showHighways
+
+# Assets mapping
+GET     /assets/*file                 controllers.Assets.at(path="/public", file)

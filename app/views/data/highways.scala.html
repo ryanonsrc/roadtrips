@@ -1,0 +1,224 @@
+@(allPoints: Seq[io.nary.roadtrips.core.regions.places.Point], bucketBounds: Seq[io.nary.roadtrips.core.regions.places.BucketBounds],
+    segmentEdges: Set[io.nary.roadtrips.core.regions.models.EdgeWrapper], foldedEdges: Set[io.nary.roadtrips.core.regions.models.EdgeWrapper],
+    flagPoints : Set[_ <: io.nary.roadtrips.core.regions.places.Point] = Set[io.nary.roadtrips.core.regions.places.Point](), showFlagPointLabels : Boolean)
+
+@import io.nary.roadtrips.core.regions.places.Point
+
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Highway Information</title>
+    <meta name="viewport" content="initial-scale=1.0, user-scalable=no" />
+    <style type="text/css">
+            html { height: 100% }
+            body { height: 100%; margin: 0; padding: 0 }
+            #map-canvas { height: 100% }
+            .customBox {
+                background: yellow;
+                border: 1px solid black;
+                position: absolute;
+            }
+    </style>
+    <script type="text/javascript"
+    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyClcfEz1jeERwZwtC2mHbcquAR_qHRkUrE&sensor=false">
+    </script>
+    <script type="text/javascript">
+            function initialize() {
+                var mapOptions = {
+                    center: new google.maps.LatLng(37.77493, -122.41942),
+                    zoom: 6,
+                    mapTypeId: google.maps.MapTypeId.ROADMAP
+                };
+                var map = new google.maps.Map(document.getElementById("map-canvas"), mapOptions);
+
+                showMarkers(map);
+            }
+            google.maps.event.addDomListener(window, 'load', initialize);
+
+            var bucketBoundsJson = @scala.xml.Unparsed(bucketBounds.map(_.toJson).mkString("[", ",", "]"));
+            var allPointsJson = @scala.xml.Unparsed(allPoints.map(_.toJson).mkString("[", ",", "]"));
+
+            var allSegmentEdgesJson = @scala.xml.Unparsed(segmentEdges.map(_.toJson).mkString("[", ",", "]"));
+            var allFoldedEdgesJson = @scala.xml.Unparsed(foldedEdges.map(_.toJson).mkString("[", ",", "]"));
+
+            var flagPointsJson = @scala.xml.Unparsed(flagPoints.map((p : Point) => p.toJson).mkString("[", ",", "]"));
+            var showFlagPointLabels = @scala.xml.Unparsed(showFlagPointLabels.toString);
+
+            function showMarkers(map) {
+
+                // Draw all bucket boundaries
+                for(var i = 0; i < bucketBoundsJson.length; i++) {
+                    var corners = bucketBoundsJson[i];
+
+                    var nw = corners.northWest; var northWestPoint = new google.maps.LatLng(nw.latitude, nw.longitude);
+                    var ne = corners.northEast; var northEastPoint = new google.maps.LatLng(ne.latitude, ne.longitude);
+                    var se = corners.southEast; var southEastPoint = new google.maps.LatLng(se.latitude, se.longitude);
+                    var sw = corners.southWest; var southWestPoint = new google.maps.LatLng(sw.latitude, sw.longitude);
+
+                    var bucketRectangle = [northWestPoint, northEastPoint, southEastPoint, southWestPoint, northWestPoint];
+
+                    var shape = new google.maps.Polygon({
+                        path: bucketRectangle,
+                        strokeColor: '#FF0000',
+                        strokeOpacity: 1.0,
+                        strokeWeight: 2
+                    });
+
+                    shape.setMap(map);
+                }
+
+                // Draw all highway points
+                for(var i = 0; i < allPointsJson.length; i++) {
+                    var circleOptions = {
+                        strokeColor: '#0054FF',
+                        strokeOpacity: 0.8,
+                        strokeWeight: 2,
+                        fillColor: '#FF0000',
+                        fillOpacity: 0.35,
+                        map: map,
+                        center: new google.maps.LatLng(allPointsJson[i].latitude, allPointsJson[i].longitude),
+                        radius: 10
+                    };
+
+                    circle = new google.maps.Circle(circleOptions);
+                }
+
+                // Draw all segment edges
+                for(var i = 0; i < allSegmentEdgesJson.length; i++) {
+                    var originLatLong = new google.maps.LatLng(allSegmentEdgesJson[i].origin.latitude, allSegmentEdgesJson[i].origin.longitude)
+                    var destinationLatLong = new google.maps.LatLng(allSegmentEdgesJson[i].destination.latitude, allSegmentEdgesJson[i].destination.longitude)
+
+                    var shape = new google.maps.Polygon({
+                        path: [originLatLong, destinationLatLong],
+                        strokeColor: '#00FF00',
+                        strokeOpacity: 1.0,
+                        strokeWeight: 2
+                    });
+
+                    shape.setMap(map);
+                }
+
+                // Draw all folded edges
+                for(var i = 0; i < allFoldedEdgesJson.length; i++) {
+                    var originLatLong = new google.maps.LatLng(allFoldedEdgesJson[i].origin.latitude, allFoldedEdgesJson[i].origin.longitude)
+                    var destinationLatLong = new google.maps.LatLng(allFoldedEdgesJson[i].destination.latitude, allFoldedEdgesJson[i].destination.longitude)
+
+                    var shape = new google.maps.Polygon({
+                        path: [originLatLong, destinationLatLong],
+                        strokeColor: '#000000',
+                        strokeOpacity: 1.0,
+                        strokeWeight: 2
+                    });
+
+                    shape.setMap(map);
+                }
+
+                // Draw all flag-points
+                for(var i = 0; i < flagPointsJson.length; i++) {
+                    var circlePosition = new google.maps.LatLng(flagPointsJson[i].latitude, flagPointsJson[i].longitude);
+
+                    var circleOptions = {
+                        strokeColor: '#23FF8F',
+                        strokeOpacity: 0.8,
+                        strokeWeight: 2,
+                        fillColor: '#000000',
+                        fillOpacity: 0.35,
+                        map: map,
+                        center: circlePosition,
+                        radius: 100
+                    };
+
+                    var circle = new google.maps.Circle(circleOptions);
+
+                    if (showFlagPointLabels) {
+                        new TxtOverlay(circlePosition,flagPointsJson[i].label,"customBox",map )
+                    }
+                }
+            }
+
+            function TxtOverlay(pos, txt, cls, map){
+                // Now initialize all properties.
+                this.pos = pos;
+                this.txt_ = txt;
+                this.cls_ = cls;
+                this.map_ = map;
+
+                this.div_ = null;
+
+                this.setMap(map);
+            }
+
+            TxtOverlay.prototype = new google.maps.OverlayView();
+
+            TxtOverlay.prototype.onAdd = function() {
+                // Create the DIV and set some basic attributes.
+                var div = document.createElement('DIV');
+                div.className = this.cls_;
+
+                div.innerHTML = this.txt_;
+
+                // Set the overlay's div_ property to this DIV
+                this.div_ = div;
+                var overlayProjection = this.getProjection();
+                var position = overlayProjection.fromLatLngToDivPixel(this.pos);
+                div.style.left = position.x + 'px';
+                div.style.top = position.y + 'px';
+                // We add an overlay to a map via one of the map's panes.
+
+                var panes = this.getPanes();
+                panes.floatPane.appendChild(div);
+            }
+
+            TxtOverlay.prototype.draw = function(){
+                var overlayProjection = this.getProjection();
+                var position = overlayProjection.fromLatLngToDivPixel(this.pos);
+
+
+                var div = this.div_;
+                div.style.left = position.x + 'px';
+                div.style.top = position.y + 'px';
+            }
+            //Optional: helper methods for removing and toggling the text overlay.
+            TxtOverlay.prototype.onRemove = function() {
+                this.div_.parentNode.removeChild(this.div_);
+                this.div_ = null;
+            }
+            TxtOverlay.prototype.hide = function() {
+                if (this.div_) {
+                this.div_.style.visibility = "hidden";
+                }
+            }
+
+            TxtOverlay.prototype.show = function() {
+                if (this.div_) {
+                    this.div_.style.visibility = "visible";
+                }
+            }
+
+            TxtOverlay.prototype.toggle = function() {
+                if (this.div_) {
+                    if (this.div_.style.visibility == "hidden") {
+                    this.show();
+                    }
+                    else {
+                    this.hide();
+                    }
+                }
+            }
+
+            TxtOverlay.prototype.toggleDOM = function() {
+                if (this.getMap()) {
+                    this.setMap(null);
+                }
+                else {
+                    this.setMap(this.map_);
+                }
+            }
+
+    </script>
+</head>
+<body>
+    <strong>Imported Highway Information</strong>
+    <div id="map-canvas"/>
+</body>
+</html>
